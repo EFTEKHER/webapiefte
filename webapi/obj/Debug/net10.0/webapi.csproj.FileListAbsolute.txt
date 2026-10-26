@@ -165,3 +165,7 @@
 /Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/obj/Debug/net10.0/webapi.pdb
 /Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/obj/Debug/net10.0/webapi.genruntimeconfig.cache
 /Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/obj/Debug/net10.0/ref/webapi.dll
+/Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/obj/Debug/net10.0/webapi.sourcelink.json
+/Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/bin/Debug/net10.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/bin/Debug/net10.0/Microsoft.Bcl.Cryptography.dll
+/Users/eftekheraliefte2000/workspace/webapinet/webapiefte/webapi/bin/Debug/net10.0/Swashbuckle.AspNetCore.SwaggerUI.dll

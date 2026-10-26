@@ -27,22 +27,17 @@ namespace webapi.controllers
                 var result=await _authService.LoginUser(dto);
                 if (result.Item1 == 0)
                 {
-                    return NotFound(ResponseResult<string>.Failure(null, "User not found"));
+                    return NotFound(ResponseResult<TokenDto>.Failure(null, result.Item2.Message));
                 }
                 if (result.Item1==1)
                 {
-                    return BadRequest(ResponseResult<string>.Failure(null, "Invalid credentials"));
+                    return BadRequest(ResponseResult<TokenDto>.Failure(null, "Invalid credentials"));
                 }
                 if (result.Item1 == 3)
                 {
-                    return StatusCode(500, ResponseResult<string>.Failure(null, result.Item2));
+                    return StatusCode(500, ResponseResult<TokenDto>.Failure(null, result.Item2.Message));
                 }
-                // if(result.Item1==2)
-                // {
-                //     return Ok(result.Item2);
-                // }
-                return Ok(ResponseResult<string>.Success(result.Item2, "Login successful"));
-
+                return Ok(ResponseResult<TokenDto>.Success(result.Item2, result.Item2.Message));
             }
             catch(Exception)
             {

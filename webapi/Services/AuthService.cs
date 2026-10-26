@@ -5,58 +5,99 @@ using webapi.Dtos;
 using webapi.IService;
 using webapi.Entities;
 namespace webapi.Services;
+
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+
 public class AuthService:IAuthService
 {
  private readonly AppDbContext _context;
- public AuthService(AppDbContext context)
+ private readonly IConfiguration _configuration;
+ public AuthService(AppDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
- public async Task<Tuple<int,string>> LoginUser(UserDto dto)
+    private (string Token, DateTime ExpiresAt) GetJwtToken(User user)
+    {
+        var claims=new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier,user.Id.ToString()),
+            new Claim(ClaimTypes.Name,user.Name ?? string.Empty),
+            new Claim(ClaimTypes.Email,user.Email ?? string.Empty),
+        };
+        var jwtKey = _configuration["JWT:Key"]
+            ?? throw new InvalidOperationException("JWT:Key is missing in appsettings.json");
+        var key= new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var credentials=new SigningCredentials(key,SecurityAlgorithms.HmacSha256);
+        var expiresAt = DateTime.UtcNow.AddMinutes(15);
+        var token= new JwtSecurityToken(
+            issuer:_configuration["JWT:Issuer"],
+            audience:_configuration["JWT:Audience"],
+            claims:claims,
+            expires:expiresAt,
+            signingCredentials:credentials
+        );
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    private static Tuple<int,TokenDto> Result(int code, string message)
+    {
+        return new Tuple<int,TokenDto>(code, new TokenDto { Message = message });
+    }
+
+    private Tuple<int,TokenDto> LoginSuccess(User user)
+    {
+        var (token, expiresAt) = GetJwtToken(user);
+        return new Tuple<int,TokenDto>(2, new TokenDto
+        {
+            Token = token,
+            ExpiresAt = expiresAt,
+            Message = "Login successful"
+        });
+    }
+
+    public async Task<Tuple<int,TokenDto>> LoginUser(UserDto dto)
     {
         try
         {
             if(dto == null)
             {
-                return  new Tuple<int, string>(0, "Invalid user data");
+                return Result(1, "Invalid user data");
             }
             var existingUser= await _context.AccountUsers.FirstOrDefaultAsync(x=>x.Email==dto.Email);
             if (existingUser == null)
             {
-                return new Tuple<int,string>(0, "User not found.please login");
+                return Result(0, "User not found.please register");
             }
-            // if(existingUser.Password != dto.Password)
-            // {
-            //     return new Tuple<int,string>(1, "Invalid password");
-            // }
             if (string.IsNullOrEmpty(existingUser.Password))
             {
-                return new Tuple<int,string>(1, "Invalid password");
+                return Result(1, "Invalid password");
             }
-            var  passwordHaser= new PasswordHasher<string>();
+            var passwordHaser= new PasswordHasher<string>();
             var verifyPassword=passwordHaser.VerifyHashedPassword(dto.Email,existingUser.Password,dto.Password);
-            if (verifyPassword == PasswordVerificationResult.Success)
+
+            switch (verifyPassword)
             {
-                return new Tuple<int,string>(2, "Login successful");
+                case PasswordVerificationResult.Success:
+                    return LoginSuccess(existingUser);
+
+                case PasswordVerificationResult.SuccessRehashNeeded:
+                    // Password is correct, but the stored hash uses old settings: upgrade it
+                    existingUser.Password=PasswordHasing(dto);
+                    await _context.SaveChangesAsync();
+                    return LoginSuccess(existingUser);
+
+                default:
+                    return Result(1, "Invalid password");
             }
-            else if (verifyPassword == PasswordVerificationResult.SuccessRehashNeeded)
-            {
-                existingUser.Password=PasswordHasing(dto);
-                _context.AccountUsers.Update(existingUser);
-                await _context.SaveChangesAsync();
-                return new Tuple<int,string>(1,"Password updated successfully");
-            }
-            else if(verifyPassword == PasswordVerificationResult.Failed)
-            {
-                return new Tuple<int,string>(1, "Invalid password");
-            }
-            return new Tuple<int,string>(0, "An unexpected error occurred");
         }
         catch(Exception)
         {
-            return new Tuple<int,string>(3, "An error occurred while processing the request");
-            
+            return Result(3, "An error occurred while processing the request");
         }
     }
     public async Task <Tuple<int,string>> RegisterUser(UserDto dto)
@@ -86,7 +127,7 @@ public class AuthService:IAuthService
 
         
     } 
-           private string PasswordHasing(UserDto dto)
+    private string PasswordHasing(UserDto dto)
         {
             var passwordHaser=new PasswordHasher<string>();
             var hash= passwordHaser.HashPassword(dto.Email, dto.Password);
